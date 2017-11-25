@@ -15,7 +15,7 @@ import numpy as np
 import torch
 
 from word_similarity.ws_utils import findIntersec, calcSpearmanr, findBiIntersec, calcBiSpearmanr
-from fastText_multilingual import fasttext
+
 
 def semEval17T2Calc(evaldata_dir_path, embs_map, lower_case):
   data_map = readData(evaldata_dir_path, lower_case)
