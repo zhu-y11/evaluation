@@ -14,6 +14,7 @@ from tqdm import tqdm
 import pickle
 import subprocess
 from gensim.models.keyedvectors import KeyedVectors
+from word_similarity import semeval17_t2
 
 import torch
 
@@ -29,7 +30,7 @@ def loadEmbeds(emb_model, emb_dir_path, emb_file_name, lower_case):
       print('loading {} {} ...'.format(emb_model[0], emb_model[i + 1]))
       embs_map[lang] = loadHeadEmbed(emb_dir_path, emb_file_name[i], lower_case)
     # whether use transformed (crosslingual) embeddings
-    semeval17_t2.transform(embs_map)    
+    #semeval17_t2.transform(embs_map)    
   if emb_model[0] == 'polyglot':
     for i, lang in enumerate(emb_model[1:]):
       print('loading {} {} ...'.format(emb_model[0], emb_model[i + 1]))

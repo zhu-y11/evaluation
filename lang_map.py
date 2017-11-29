@@ -23,3 +23,7 @@ lang_map = {
             'italian': 'it'
           }
 
+ud_map = {
+          'UD_English': 'en',
+          'UD_Italian': 'it'
+         }

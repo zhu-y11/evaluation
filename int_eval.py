@@ -69,8 +69,6 @@ def loadDataAndEval(args, embs_map):
     print('{} {:.5f}'.format(r[0], r[1]))
     print('{} {:.5f}'.format(inter_r[0], inter_r[1]))
   if args.evaldata_name == 'semeval17t2':
-    # whether use transformed (crosslingual) embeddings
-    #semeval17_t2.transform(embs_map)
     semeval17_t2.semEval17T2Calc(args.evaldata_path, embs_map, args.lower_case)
 
 
