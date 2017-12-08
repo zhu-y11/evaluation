@@ -57,18 +57,19 @@ def readData(data_file_path, lower_case):
 
 def readMultData(dir_path, lower_case):
   data_map = {}
-  for data_file in os.listdir(dir_path):
-    if not data_file.endswith('.txt'):
-      continue
-    try:
-      lang = lang_map[data_file[data_file.find('_') + 1: data_file.rfind('.')].lower()]
-    except:
-      continue
-    with open(os.path.join(dir_path, data_file), 'r') as f:
-      lines = f.read().strip().split('\n')
-      lines = lines[1:]
-      lines = [line.strip().split(',') for line in lines]
-      word_pairs = [[line[0].lower(), line[1].lower()] if lower_case else [line[0], line[1]] for line in lines]
-      sims = torch.Tensor(list(map(float, [line[-1] for line in lines])))
-      data_map[lang] = word_pairs, sims
+  for root, dirs, files in os.walk(dir_path):
+    for data_file in files:
+      if not data_file.endswith('.txt'):
+        continue
+      try:
+        lang = lang_map[data_file[data_file.find('_') + 1: data_file.rfind('.')].lower()]
+      except:
+        continue
+      with open(os.path.join(root, data_file), 'r') as f:
+        lines = f.read().strip().split('\n')
+        lines = lines[1:]
+        lines = [line.strip().split(',') for line in lines]
+        word_pairs = [[line[0].lower(), line[1].lower()] if lower_case else [line[0], line[1]] for line in lines]
+        sims = torch.Tensor(list(map(float, [line[-1] for line in lines])))
+        data_map[lang] = word_pairs, sims
   return data_map

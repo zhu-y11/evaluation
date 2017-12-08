@@ -3,7 +3,7 @@
 """
 Language maps from language name to ISO code
 @Author Yi Zhu
-Upated 11/21/2017
+Upated 01/12/2017
 """
 
 #************************************************************
@@ -20,7 +20,21 @@ lang_map = {
             'russian': 'ru',
             'ru': 'ru',
             # Italian
-            'italian': 'it'
+            'italian': 'it',
+            'it': 'it',
+            # Spanish
+            'spanish': 'es',
+            'es': 'es',
+            'sp': 'es',
+            # French
+            'french': 'fr',
+            'fr': 'fr',
+            # Dutch
+            'dutch': 'nl',
+            'nl': 'nl',
+            # Turkish
+            'turkish': 'tr',
+            'tr': 'tr'
           }
 
 ud_map = {

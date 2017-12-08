@@ -29,7 +29,6 @@ def main(args):
                                args.embedding_dir_path,
                                args.embedding_file_name,
                                args.lower_case)
-  assert(len(embs_map['en'][0]) == embs_map['en'][1].size()[0])
 
   loadDataAndEval(args, embs_map)
 

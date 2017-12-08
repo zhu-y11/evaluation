@@ -3,7 +3,7 @@
 """
 POS Tagging with Bi-LSTM
 @Author Yi Zhu
-Upated 28/11/2017
+Upated 08/12/2017
 """
 
 #************************************************************
@@ -43,7 +43,8 @@ class BiLSTM_POSTagger(nn.Module):
 
     self.lstm = nn.LSTM(self.embed_dim, hidden_dim // 2, 
                         num_layers = 2, bidirectional = True)
-
+    
+    self.dropout = nn.Dropout(p = 0.4)
     # Maps the output of the LSTM into tag space.
     self.hidden2tag = nn.Linear(hidden_dim, self.target_size)
 
@@ -67,16 +68,23 @@ class BiLSTM_POSTagger(nn.Module):
 
   def forward(self, sentence):     
     self.hidden = self.init_hidden()
+    
     embeds = self.word_embeds(sentence).view(len(sentence), 1, -1)
+    if self.training:
+      embeds = self.dropout(embeds)
+
     lstm_out, self.hidden = self.lstm(embeds, self.hidden)
     lstm_out = lstm_out.view(len(sentence), self.hidden_dim)
+    if self.training:
+      lstm_out = self.dropout(lstm_out)
+
     tag_space = self.hidden2tag(lstm_out)
     tag_scores = F.log_softmax(tag_space).view(len(sentence), -1)
     return tag_scores    
 
 
 
-def evalEmbed(embs_tuple, train_data, dev_data, test_data, bs = 10, epoch = 20, hidden_dim = 600, report_every = 5):
+def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 100, epoch = 10, hidden_dim = 600, report_every = 5):
   word2idx, idx2word, tag2idx, idx2tag = getVocabAndTag(train_data, dev_data, test_data)
   tagger = BiLSTM_POSTagger(word2idx, idx2word, tag2idx, idx2tag, embs_tuple, hidden_dim)
   criterion = nn.NLLLoss()
@@ -97,21 +105,25 @@ def evalEmbed(embs_tuple, train_data, dev_data, test_data, bs = 10, epoch = 20, 
   best_acc_dev = .0
   corbest_acc_test = .0
 
+  if cuda:
+    tagger.cuda()
+    criterion = criterion.cuda()
+    
   for i in range(epoch):
     # shuflle training data
     shuffle(train_seqs)
     n_batch = int(len(train_seqs) / bs) if len(train_seqs) % bs == 0 else int(len(train_seqs) / bs) + 1
     for j in range(n_batch):
       batch_train = train_seqs[j * bs: (j + 1) * bs]
-      total_loss_train, acc_train = train(batch_train, tagger, criterion, optimizer) 
+      total_loss_train, acc_train = train(batch_train, tagger, criterion, optimizer, cuda) 
       if j % report_every == 0:
-        _, acc_dev = test(dev_seqs, tagger, criterion)
-        _, acc_test = test(test_seqs, tagger, criterion)
+        _, acc_dev = test(dev_seqs, tagger, criterion, cuda)
+        _, acc_test = test(test_seqs, tagger, criterion, cuda)
         print('current dev_acc = {:.3f}%, current test_acc = {:.3f}%'.format(acc_dev, acc_test))
         if acc_dev > best_acc_dev:
           best_acc_dev = acc_dev
           corbest_acc_test = acc_test 
-          torch.save(tagger, 'best_tagger.model')
+          torch.save(tagger, 'best_tagger_{}.model'.format(lang))
       print("epoch {}, batch {}/{}\nloss = {:.5f}  train_acc = {:.3f}%\nbest dev_acc = {:.3f}%  corresponding test_acc = {:.3f}%".format(
             i + 1, j + 1, n_batch, total_loss_train / len(batch_train), acc_train, best_acc_dev, corbest_acc_test))
 
@@ -155,12 +167,16 @@ def prepSeqs(data, word2idx, tag2idx):
   return new_data
 
 
-def train(train_seqs, tagger, criterion, optimizer):
+def train(train_seqs, tagger, criterion, optimizer, cuda):
   optimizer.zero_grad()
-  total_loss = torch.Tensor([0])
+  tagger.train()
+  total_loss = torch.cuda.Tensor([0]) if cuda else torch.Tensor([0])
   acc = 0
   n_inst = 0
   for train_seq, targets in train_seqs:
+    if cuda:
+      train_seq = train_seq.cuda()
+      targets = targets.cuda()
     tag_scores = tagger(train_seq)
     acc += (tag_scores.max(1)[1] == targets).sum().data[0]
     n_inst += tag_scores.size()[0]
@@ -174,11 +190,15 @@ def train(train_seqs, tagger, criterion, optimizer):
   return total_loss, acc
 
 
-def test(seqs, tagger, criterion):
-  total_loss = torch.Tensor([0])
+def test(seqs, tagger, criterion, cuda):
+  tagger.eval()
+  total_loss = torch.cuda.Tensor([0]) if cuda else torch.Tensor([0])
   acc = 0
   n_inst = 0
   for seq, targets in seqs:
+    if cuda:
+      seq = seq.cuda()
+      targets = targets.cuda()
     tag_scores = tagger(seq)
     acc += (tag_scores.max(1)[1] == targets).sum().data[0]
     n_inst += tag_scores.size()[0]

@@ -9,6 +9,7 @@ Upated 22/11/2017
 #************************************************************
 # Imported Libraries
 #************************************************************
+import sys
 import os
 from tqdm import tqdm
 import pickle
@@ -158,7 +159,10 @@ def loadPklEmbed(emb_dir_path, emb_file_name, lower_case):
  
 def loadBinEmbed(emb_dir_path, emb_file_name, lower_case):
   emb_file_path = os.path.join(emb_dir_path, emb_file_name)
-  if not os.path.isfile(emb_file_path + '.txt'):
+  try:
+    return loadHeadEmbed(emb_dir_path, emb_file_name, lower_case)
+  except:
+    # no pre-saved model, no .txt model, must have .bin model
     model = KeyedVectors.load_word2vec_format(emb_file_path + '.bin', binary = True)
     model.save_word2vec_format(emb_file_path + '.txt', binary = False)
   return loadHeadEmbed(emb_dir_path, emb_file_name, lower_case)
@@ -212,3 +216,10 @@ def loadNumberbatchEmbed(emb_dir_path, emb_file_name, langs, lower_case):
     torch.save(embs_map[lang][1], emb_file_path + '.{}.pth'.format(lang))
 
   return embs_map
+
+
+
+if __name__ == '__main__':
+  emb_dir_path = sys.argv[1]
+  emb_file_name = sys.argv[2]
+  loadBinEmbed(emb_dir_path, emb_file_name, True)
