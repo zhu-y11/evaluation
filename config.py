@@ -15,7 +15,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description = 'Evaluations for Word Embeddings')
     # Embeddings
     parser.add_argument('--embedding_model', nargs = '+', 
-    default = ['word2vec', 'it'],
+    #default = ['word2vec', 'it'],
     #default = ['fasttext', 'it'],
     #default = ['glove', 'it'],
     #default = ['fasttext', 'en', 'de', 'it', 'ru'], 

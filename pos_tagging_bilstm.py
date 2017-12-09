@@ -27,7 +27,7 @@ random.seed(1234)
 # Create model
 class BiLSTM_POSTagger(nn.Module):
   def __init__(self, word2idx, idx2word, tag2idx, idx2tag, 
-               pre_embeds, hidden_dim):
+               pre_embeds, hidden_dim, cuda):
     super(BiLSTM_POSTagger, self).__init__()
     self.word2idx = word2idx
     self.idx2word = idx2word
@@ -35,6 +35,7 @@ class BiLSTM_POSTagger(nn.Module):
     self.idx2tag = idx2tag
     self.vocab_size = len(word2idx)
     self.target_size = len(tag2idx)
+    self.cuda = cuda
 
     self.embed_dim = pre_embeds[1].size()[1]
     self.hidden_dim = hidden_dim
@@ -62,8 +63,12 @@ class BiLSTM_POSTagger(nn.Module):
 
 
   def init_hidden(self):
-    return (autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2)),
-            autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2)))
+      hidden = autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2)),
+               autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2))
+    if self.cuda:
+      return hidden.cuda()
+    else:
+      return hidden
 
 
   def forward(self, sentence):     
@@ -86,7 +91,7 @@ class BiLSTM_POSTagger(nn.Module):
 
 def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 100, epoch = 10, hidden_dim = 600, report_every = 5):
   word2idx, idx2word, tag2idx, idx2tag = getVocabAndTag(train_data, dev_data, test_data)
-  tagger = BiLSTM_POSTagger(word2idx, idx2word, tag2idx, idx2tag, embs_tuple, hidden_dim)
+  tagger = BiLSTM_POSTagger(word2idx, idx2word, tag2idx, idx2tag, embs_tuple, hidden_dim, cuda)
   criterion = nn.NLLLoss()
   optimizer = optim.Adam(tagger.parameters(), lr = 0.01) 
   
@@ -170,7 +175,7 @@ def prepSeqs(data, word2idx, tag2idx):
 def train(train_seqs, tagger, criterion, optimizer, cuda):
   optimizer.zero_grad()
   tagger.train()
-  total_loss = torch.cuda.Tensor([0]) if cuda else torch.Tensor([0])
+  total_loss = torch.cuda.FloatTensor([0]) if cuda else torch.FloatTensor([0])
   acc = 0
   n_inst = 0
   for train_seq, targets in train_seqs:
@@ -192,7 +197,7 @@ def train(train_seqs, tagger, criterion, optimizer, cuda):
 
 def test(seqs, tagger, criterion, cuda):
   tagger.eval()
-  total_loss = torch.cuda.Tensor([0]) if cuda else torch.Tensor([0])
+  total_loss = torch.cuda.FloatTensor([0]) if cuda else torch.FloatTensor([0])
   acc = 0
   n_inst = 0
   for seq, targets in seqs:
