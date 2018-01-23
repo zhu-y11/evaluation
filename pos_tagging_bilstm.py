@@ -35,7 +35,7 @@ class BiLSTM_POSTagger(nn.Module):
     self.idx2tag = idx2tag
     self.vocab_size = len(word2idx)
     self.target_size = len(tag2idx)
-    self.cuda = cuda
+    self.use_cuda = cuda
 
     self.embed_dim = pre_embeds[1].size()[1]
     self.hidden_dim = hidden_dim
@@ -63,10 +63,10 @@ class BiLSTM_POSTagger(nn.Module):
 
 
   def init_hidden(self):
-      hidden = autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2)),
-               autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2))
-    if self.cuda:
-      return hidden.cuda()
+    hidden = (autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2)),
+              autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2)))
+    if self.use_cuda:
+      return (hidden[0].cuda(), hidden[1].cuda())
     else:
       return hidden
 
@@ -89,12 +89,16 @@ class BiLSTM_POSTagger(nn.Module):
 
 
 
-def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 100, epoch = 10, hidden_dim = 600, report_every = 5):
+def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 32, epoch = 15, hidden_dim = 600, report_every = 5):
   word2idx, idx2word, tag2idx, idx2tag = getVocabAndTag(train_data, dev_data, test_data)
   tagger = BiLSTM_POSTagger(word2idx, idx2word, tag2idx, idx2tag, embs_tuple, hidden_dim, cuda)
   criterion = nn.NLLLoss()
-  optimizer = optim.Adam(tagger.parameters(), lr = 0.01) 
   
+  if cuda:
+    tagger = tagger.cuda()
+    criterion = criterion.cuda()
+
+  optimizer = optim.Adam(tagger.parameters(), lr = 0.01) 
   """
     [
       [
@@ -109,10 +113,6 @@ def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 100,
   test_seqs = prepSeqs(test_data, word2idx, tag2idx)
   best_acc_dev = .0
   corbest_acc_test = .0
-
-  if cuda:
-    tagger.cuda()
-    criterion = criterion.cuda()
     
   for i in range(epoch):
     # shuflle training data

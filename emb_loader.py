@@ -163,7 +163,7 @@ def loadBinEmbed(emb_dir_path, emb_file_name, lower_case):
     return loadHeadEmbed(emb_dir_path, emb_file_name, lower_case)
   except:
     # no pre-saved model, no .txt model, must have .bin model
-    model = KeyedVectors.load_word2vec_format(emb_file_path + '.bin', binary = True)
+    model = KeyedVectors.load_word2vec_format(emb_file_path + '.bin', binary = True, encoding='utf-8', unicode_errors='ignore')
     model.save_word2vec_format(emb_file_path + '.txt', binary = False)
   return loadHeadEmbed(emb_dir_path, emb_file_name, lower_case)
 
