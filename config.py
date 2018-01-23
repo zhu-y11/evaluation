@@ -3,7 +3,7 @@
 """
 Configurations for the main scripts
 @Author Yi Zhu
-Upated 09/12/2017
+Upated 01/23/2018
 """
 
 #************************************************************
@@ -15,17 +15,17 @@ def parse_args():
     parser = argparse.ArgumentParser(description = 'Evaluations for Word Embeddings')
     # Embeddings
     parser.add_argument('--embedding_model', nargs = '+', 
-    default = ['word2vec', 'he'],
+    default = ['word2vec', 'en'],
     #default = ['fasttext', 'he'],
     #default = ['glove', 'he'],
     #default = ['fasttext', 'en', 'de', 'it', 'ru'], 
     #default = ['polyglot', 'en', 'de', 'it', 'ru'], 
     #default = ['numberbatch', 'en', 'de', 'it', 'ru'], 
                         help = 'Embedding Model Name')
-    parser.add_argument('--embedding_dir_path', default = '/home/yz568/rds/hpc-work/word2vec',
+    parser.add_argument('--embedding_dir_path', default = '/media/hdd/yz568/data/word2vec',
                         help = 'Path to Embedding File')
     parser.add_argument('--embedding_file_name', nargs = '+',  
-    default = ['he.wiki.word2vec'],
+    default = ['en.wiki.word2vec'],
     #default = ['he.wiki.fasttext'],
     #default = ['he.wiki.glove'],
     #default = ['wiki.en.vec', 'wiki.de.vec', 'wiki.it.vec', 'wiki.es.vec', 'wiki.fa.vec'],
@@ -35,13 +35,13 @@ def parse_args():
     parser.add_argument('--lower_case', action = 'store_true', default = True)
     parser.add_argument('--cuda', action = 'store_true', default = True)
     # Evaluation Task
-    parser.add_argument('--task', default = 'word_similarity',
+    parser.add_argument('--task', default = '_',
                         choices = ['word_similarity', 'pos_tagging', '_'],
                         help = 'Task Type')
     # Evaluation Data
-    parser.add_argument('--evaldata_path', default = '/home/yz568/rds/hpc-work/Multilingual-Simlex-999/SimLex_ALL_Langs_TXT_Format',
+    parser.add_argument('--evaldata_path', default = '/media/hdd/yz568/data/semeval16t5/subtask1/restaurant',
 			help = 'Data Path for Evaluation Data')
-    parser.add_argument('--evaldata_name', default = 'multi_simlex999', 
+    parser.add_argument('--evaldata_name', default = 'semeval16t5', 
     choices = ['simlex999', 'multi_simlex999', 
                'simverb3500', 'men3000', 'rareword', 'semeval17t2', 'semeval16t5'
                'wordsim353', 'wordsim353_rel', 'wordsim353_sim', 'multi_wordsim353', 'multi_wordsim353_rel', 'multi_wordsim353_sim',

@@ -3,7 +3,7 @@
 """
 Extrinsic Evaluation for word embeddings
 @Author Yi Zhu
-Upated 08/12/2017
+Upated 23/01/2017
 """
 
 #************************************************************
@@ -50,8 +50,8 @@ def loadDataAndEval(args, embs_map):
   if args.evaldata_name == 'semeval16t5':
     train_data, dev_data, test_data = semeval16t5_loader.loadData(args.evaldata_path)
     sentiment_analysis.evalEmbed(embs_map['en'], train_data['en']['subtask1']['restaurant'],
-                                           dev_data['en']['subtask1']['restaurant'], 
-                                           test_data['en']['subtask1']['restaurant'], 'en')
+                                                 dev_data['en']['subtask1']['restaurant'], 
+                                                 test_data['en']['subtask1']['restaurant'], 'en', args.cuda)
 
 
 if __name__ == '__main__':
