@@ -69,6 +69,8 @@ def readMultData(dir_path, lower_case):
         lines = f.read().strip().split('\n')
         lines = lines[1:]
         lines = [line.strip().split(',') for line in lines]
+        if len(lines[0]) == 1:
+          lines = [line[0].split('\t') for line in lines]
         word_pairs = [[line[0].lower(), line[1].lower()] if lower_case else [line[0], line[1]] for line in lines]
         sims = torch.Tensor(list(map(float, [line[-1] for line in lines])))
         data_map[lang] = word_pairs, sims

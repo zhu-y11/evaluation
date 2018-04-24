@@ -3,7 +3,7 @@
 """
 Loading data for SemEval 16 t5
 @Author Yi Zhu
-Upated  04/12/2017
+Upated  23/01/2018
 """
 
 #************************************************************
@@ -33,8 +33,8 @@ def loadData(dir_path):
     for file_name in files:
       if not file_name.endswith('.xml'):
         continue
-      prefix = file_name.find('.xml')
-      lang = lang_map[file_name[:prefix].split('_')[2].lower()]
+      suffix = file_name.find('.xml')
+      lang = lang_map[file_name[:suffix].split('_')[2].lower()]
       data_type = os.path.basename(root)
       domain = os.path.basename(os.path.dirname(root))
       task = os.path.basename(os.path.dirname(os.path.dirname(root)))
