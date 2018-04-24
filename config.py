@@ -17,12 +17,12 @@ def parse_args():
     # Embeddings file paths
     parser.add_argument('--emb_path', nargs = '+', 
         default = ['/home/yz568/Documents/code/w2v_subword/code/de.mo.posadd.035.vec.txt',
-                   '/home/yz568/Documents/code/w2v_subword/code/de.bpe.addpos.035.vec.txt'],
+                   '/home/yz568/Documents/code/w2v_subword/code/ru.bpe.1attpos.035.vec.txt'],
         help = 'Embedding file paths')
 
     # Languages
     parser.add_argument('--lang', '-l', nargs = '+',
-        default = ['de', 'de'],
+        default = ['de', 'ru'],
         help = 'Languages to evaluate (same length as embedding paths, can be repeated)')
 
     # Evaluation Task
