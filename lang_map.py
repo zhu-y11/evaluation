@@ -3,7 +3,7 @@
 """
 Language maps from language name to ISO code
 @Author Yi Zhu
-Upated 01/12/2017
+Upated 04/24/2018
 """
 
 #************************************************************
@@ -51,16 +51,3 @@ lang_map = {
             'vietnamese': 'vi',
             'vi': 'vi'
           }
-
-ud_map = {
-          'UD_English': 'en',
-          'UD_Italian': 'it',
-          'UD_German': 'de',
-          'UD_Russian': 'ru',
-          'UD_Finnish': 'fi',
-          'UD_Turkish': 'tr',
-          'UD_Hebrew': 'he',
-          'UD_Arabic': 'ar',
-          'UD_Chinese': 'zh',
-          'UD_Vietnamese': 'vi'
-         }

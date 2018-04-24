@@ -3,7 +3,7 @@
 """
 Util scripts for word similarity task
 @Author Yi Zhu
-Upated 20.11.2017
+Upated 04/24/2018
 """
 
 #************************************************************

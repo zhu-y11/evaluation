@@ -27,7 +27,7 @@ random.seed(1234)
 
 class BiLSTM_SentimentAnalyzer(nn.Module):
   def __init__(self, word2idx, idx2word, ent2idx, idx2ent, asp2idx, idx2asp, lb2idx, idx2lb, pre_embeds, 
-               hidden_dim = 200, ea_dim = 50, num_layers = 2, bidirectional = True, mlpin_dim = 100, mlph_dim = 60):
+               hidden_dim = 200, ea_dim = 50, num_layers = 2, bidirectional = True, mlph_dim = 100):
     super(BiLSTM_SentimentAnalyzer, self).__init__()
     self.word2idx = word2idx
     self.idx2word = idx2word
@@ -52,18 +52,21 @@ class BiLSTM_SentimentAnalyzer(nn.Module):
     self.ent_embeds = nn.Embedding(self.ent_size, self.ea_dim)
     self.asp_embeds = nn.Embedding(self.asp_size, self.ea_dim)
 
-    self.dropout = nn.Dropout(p = 0.4)
+    self.dropout = nn.Dropout(p = 0.3)
 
     self.hidden_dim = hidden_dim
     self.num_layers = num_layers
     self.bidirectional = bidirectional 
     self.lstm = nn.LSTM(self.embed_dim, self.hidden_dim // 2, 
-                        num_layers = self.num_layers, dropout = 0.4, bidirectional = self.bidirectional)
+                        num_layers = self.num_layers, dropout = 0.3, bidirectional = self.bidirectional)
     self.hidden = self.init_hidden()
+    
+    # scoring network for attentions
+    self.mlp_intoh = nn.Linear(self.hidden_dim + 2 * self.ea_dim, mlph_dim)
+    self.mlp_htoo = nn.Linear(mlph_dim, 1)
 
-    self.mlpintrans = nn.Linear(self.hidden_dim + 2 * self.ea_dim, mlpin_dim)
-    self.mlp_itoh = nn.Linear(mlpin_dim, mlph_dim)
-    self.mlp_htoo = nn.Linear(mlph_dim, self.target_size)
+    # projection from hidden_dim to target size
+    self.atttoo = nn.Linear(self.hidden_dim, self.target_size)
 
 
   def initEmbeds(self, pre_embeds):
@@ -89,25 +92,37 @@ class BiLSTM_SentimentAnalyzer(nn.Module):
 
     embeds = self.word_embeds(sent).view(len(sent), 1, -1)
     ent_embeds = self.ent_embeds(ents).view(len(ents), -1)
-    asp_embeds = self.ent_embeds(asps).view(len(asps), -1)
+    asp_embeds = self.asp_embeds(asps).view(len(asps), -1)
+
     if self.training:
       embeds = self.dropout(embeds)
-      ent_embeds = self.dropout(ent_embeds)
-      asp_embeds = self.dropout(asp_embeds)
+   
+    # n = len(sent), m = len(ents)
+    lstm_out, self.hidden = self.lstm(embeds) 
+    # m, n, hidden_dim
+    lstm_out = lstm_out.squeeze().unsqueeze(0).repeat(len(ents), 1, 1)
+    # m, n, 2 * ea_dim
+    ent_asp_embeds = torch.cat((ent_embeds, asp_embeds), 1).unsqueeze(1).repeat(1, len(sent), 1)
+    # m, n, hidden_dim + 2 * ea_dim
+    h_eas_cat = torch.cat((lstm_out, ent_asp_embeds), 2)
 
-    lstm_out, self.hidden = self.lstm(embeds)
-    stack_lstm_out = lstm_out[-1].repeat(ents.size()[0], 1)
-
-    h_eas_cat = torch.cat((stack_lstm_out, ent_embeds, asp_embeds), 1)
+    # m, n, mlph_dim
+    scr_h = F.relu(self.mlp_intoh(h_eas_cat))
+    # m, n, 1
+    scrs = self.mlp_htoo(scr_h)
+    atts = F.softmax(scrs, 1)
     
-    mlp_in = F.tanh(self.mlpintrans(h_eas_cat))
-    h = F.relu(self.mlp_itoh(mlp_in))
-    os = self.mlp_htoo(h)
+    # m, n, hidden_dim
+    lstm_out_att = lstm_out * atts
+    # m, hidden_dim
+    lstm_out_att = lstm_out_att.sum(1)
+ 
+    os = self.atttoo(lstm_out_att)
     prob_os = F.log_softmax(os, 1)
     return prob_os
 
 
-def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 16, epoch = 20, report_every = 2):
+def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 1, epoch = 20, report_every = 5):
   if cuda:
     torch.cuda.manual_seed(1234)
   word2idx, idx2word, \
@@ -120,7 +135,8 @@ def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 16, 
                                       lb2idx, idx2lb, 
                                       embs_tuple)
   criterion = nn.NLLLoss()
-  optimizer = optim.Adam(analyzer.parameters(), lr = 0.001) 
+  optimizer = optim.Adam(analyzer.parameters(), lr = 0.01) 
+  #optimizer = optim.SGD(analyzer.parameters(), lr = 0.01, momentum = 0.9) 
 
   if cuda:
     analyzer.cuda()
@@ -136,8 +152,9 @@ def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 16, 
       ...
     ]
   '''
-  train_seqs = prepSeqs(train_data, word2idx, ent2idx, asp2idx, lb2idx, cuda)
-  dev_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, lb2idx, cuda)
+  #train_seqs = prepSeqs(train_data, word2idx, ent2idx, asp2idx, lb2idx, cuda)
+  #dev_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, lb2idx, cuda)
+  train_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, lb2idx, cuda)
   test_seqs = prepSeqs(test_data, word2idx, ent2idx, asp2idx, lb2idx, cuda)
   best_acc_dev = .0
   corbest_acc_test = .0
@@ -150,15 +167,14 @@ def evalEmbed(embs_tuple, train_data, dev_data, test_data, lang, cuda, bs = 16, 
       batch_train = train_seqs[j * bs: (j + 1) * bs]
       total_loss_train, acc_train = train(batch_train, analyzer, criterion, optimizer, cuda) 
       if j % report_every == 0:
-        _, acc_dev = test(dev_seqs, analyzer, criterion, cuda)
+        _, acc_dev = test(train_seqs, analyzer, criterion, cuda)
         _, acc_test = test(test_seqs, analyzer, criterion, cuda)
         print('current dev_acc = {:.3f}%, current test_acc = {:.3f}%'.format(acc_dev, acc_test))
         if acc_dev > best_acc_dev:
           best_acc_dev = acc_dev
           corbest_acc_test = acc_test 
           #torch.save(analyzer, 'best_analyzer_{}.model'.format(lang))
-      print("epoch {}, batch {}/{}\nloss = {:.5f}  train_acc = {:.3f}%\nbest dev_acc = {:.3f}%  corresponding test_acc = {:.3f}%".format(
-            i + 1, j + 1, n_batch, total_loss_train / len(batch_train), acc_train, best_acc_dev, corbest_acc_test))
+      print("epoch {}, batch {}/{}\nloss = {:.5f}  train_acc = {:.3f}%\nbest dev_acc = {:.3f}%  corresponding test_acc = {:.3f}%".format(i + 1, j + 1, n_batch, total_loss_train / len(batch_train), acc_train, best_acc_dev, corbest_acc_test))
 
 
 def getVocabAndLabel(train_data, dev_data, test_data):

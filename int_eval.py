@@ -3,7 +3,7 @@
 """
 Intrinsic Evaluation for word embeddings
 @Author Yi Zhu
-Upated 21/11/2017
+Upated 04/24/2018
 """
 
 #************************************************************
@@ -15,22 +15,19 @@ import torch
 
 import config
 import emb_loader
-from word_similarity import simlex_calc
-from word_similarity import wordsim_calc
-from word_similarity import simverb_calc
-from word_similarity import men_calc
-from word_similarity import rareword_calc
-from word_similarity import semeval17_t2
+from word_similarity import calc_wordsim
+
+import logging
+logger = logging.getLogger(__name__)
 
 
-def main(args):
-  print('loading word embeddings {} ...'.format(args.embedding_model[0]))
-  embs_map = emb_loader.loadEmbeds(args.embedding_model,
-                               args.embedding_dir_path,
-                               args.embedding_file_name,
-                               args.lower_case)
-
-  loadDataAndEval(args, embs_map)
+def word_similarity(args, test_data_dir):
+  logger.info('Calculating word similarity...')
+  for i, emb_path in enumerate(args.emb_path):
+    lang = args.lang[i]
+    logger.info('Loading word embeddings from {}'.format(lang, emb_path))
+    vocab, emb = emb_loader.loadEmbed(emb_path, args.lower_case)
+    calc_wordsim.eval_word_similarity(lang, test_data_dir, vocab, emb, args.lower_case) 
 
 
 def loadDataAndEval(args, embs_map):
@@ -69,8 +66,3 @@ def loadDataAndEval(args, embs_map):
     print('{} {:.5f}'.format(inter_r[0], inter_r[1]))
   if args.evaldata_name == 'semeval17t2':
     semeval17_t2.semEval17T2Calc(args.evaldata_path, embs_map, args.lower_case)
-
-
-if __name__ == '__main__':
-  args = config.parse_args()
-  main(args)
