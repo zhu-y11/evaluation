@@ -35,7 +35,7 @@ class BiLSTM_POSTagger(nn.Module):
     self.idx2tag = idx2tag
     self.vocab_size = len(word2idx)
     self.target_size = len(tag2idx)
-    self.cuda = cuda
+    self.use_cuda = cuda
 
     self.embed_dim = pre_embeds[1].size()[1]
     self.hidden_dim = hidden_dim
@@ -65,8 +65,8 @@ class BiLSTM_POSTagger(nn.Module):
   def init_hidden(self):
       hidden = autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2)),
                autograd.Variable(torch.randn(4, 1, self.hidden_dim // 2))
-    if self.cuda:
-      return hidden.cuda()
+    if self.use_cuda:
+      return (hidden[0].cuda(), hidden[1].cuda())
     else:
       return hidden
 
