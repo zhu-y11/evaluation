@@ -38,6 +38,7 @@ def readData(data_file_path, lower_case):
   with open(data_file_path, 'r') as f:
     lines = f.read().strip().split('\n')
     lines = [line.strip().split() for line in lines]
+    lines = [line.strip() for line in lines]
     word_pairs = [[line[0].lower(), line[1].lower()] if lower_case else [line[0], line[1]] for line in lines]
     sims = torch.Tensor(list(map(float, [line[-1] for line in lines])))
     return word_pairs, sims
