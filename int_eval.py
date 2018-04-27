@@ -25,7 +25,7 @@ def word_similarity(args, test_data_dir):
   logger.info('Calculating word similarity...')
   for i, emb_path in enumerate(args.emb_path):
     lang = args.lang[i]
-    logger.info('Loading word embeddings from {}'.format(lang, emb_path))
+    logger.info('Loading word embeddings: {}'.format(os.path.basename(emb_path)))
     vocab, emb = emb_loader.loadEmbed(emb_path, args.lower_case)
     calc_wordsim.eval_word_similarity(lang, test_data_dir, vocab, emb, args.lower_case) 
 

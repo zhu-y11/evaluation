@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def eval_word_similarity(lang, test_data_dir, vocab, emb, lower_case):
   logger.info('Loading test data from {}, language: {}'.format(test_data_dir, lang))
   test_data_lang_dir = os.path.join(test_data_dir, lang)
-  for file_name in os.listdir(test_data_lang_dir):
+  for file_name in sorted(os.listdir(test_data_lang_dir)):
     print('Test File: {}'.format(file_name))
     test_file = os.path.join(test_data_lang_dir, file_name) 
     word_pairs, sims = readData(test_file, lower_case)
