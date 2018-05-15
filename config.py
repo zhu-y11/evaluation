@@ -16,13 +16,12 @@ def parse_args():
     
     # Embeddings file paths
     parser.add_argument('--emb_path', nargs = '+', 
-        default = ['../w2v_subword/code/ft/de.035.myft.st.vec.txt',
-          '../w2v_subword/code/ft/de.035.myft.wow.vec.txt'],
+        default = ['/home/yz568/Documents/code/w2v_subword/code/sms/de.035.sms.mpadd.vec.txt'],
         help = 'Embedding file paths')
 
     # Languages
     parser.add_argument('--lang', '-l', nargs = '+',
-        default = ['de', 'de'],
+        default = ['de'],
         help = 'Languages to evaluate (same length as embedding paths, can be repeated)')
 
     # Evaluation Task
@@ -34,7 +33,8 @@ def parse_args():
 
     # Evaluation Data
     parser.add_argument('--evaldata_path', nargs = '+', 
-        default = ['/mnt/hdd/yz568/data/word_similarity'],
+        # if ends with txt, then it's just a txt file, otherwise it's a directory
+        default = ['/mnt/hdd/yz568/data/word_similarity/de/2.mws353.de.txt'],
         help = 'Data Path for Evaluation Data')
     
     # Others
