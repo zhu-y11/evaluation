@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 
 def loadEmbed(emb_path, lower_case):
   emb_file_name = os.path.basename(emb_path)
-  if emb_file_name.endswith('.txt'):
+  if '.txt' in emb_file_name:
     logger.debug('loading text embedding...')
     return loadTextEmd(emb_path, lower_case)
 
 
 def loadTextEmd(emb_path, lower_case):
-  base_emb_path = emb_path[:emb_path.rfind('.txt')]
+  base_emb_path = emb_path[:emb_path.rfind('.')]
   logger.debug('base embedding path: {}'.format(base_emb_path))
   # found the pytorch format
   if os.path.isfile(base_emb_path + '.pth') and os.path.isfile(base_emb_path + '.vocab'):
