@@ -46,7 +46,8 @@ def get_words_from_dir(args, indir, words):
   for root, dirs, files in os.walk(indir):
     for infile in files:
       infile = os.path.join(root, infile)
-      get_words_from_file(args, infile, words)
+      if infile.endswith('.conllu'):
+        get_words_from_file(args, infile, words)
 
 
 def get_words_from_file(args, infile, words):
