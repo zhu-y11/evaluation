@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 def loadEmbed(emb_path, lower_case):
   emb_file_name = os.path.basename(emb_path)
   if '.txt' in emb_file_name:
-    logger.debug('loading text embedding...')
+    logger.debug('loading TEXT embeddings...')
     return loadTextEmd(emb_path, lower_case)
 
 
@@ -79,11 +79,12 @@ def loadTextEmd(emb_path, lower_case):
       f.write(word + '\n')
   torch.save(vectors, base_emb_path + '.pth')
   vocab = [v.lower() if lower_case else v for v in vocab]
+  assert(len(vocab) == vectors.size()[0])
   return (vocab, vectors)
 
 
 def loadTorchEmd(base_emb_path, lower_case):
-    logger.info('==> Vocab and Pth file found, loading to memory...')
+    logger.info('==> Vocab and pth file found, loading to memory...')
     with open(base_emb_path + '.vocab') as f:
       vocab = f.read().rstrip().split('\n')
     vocab = [v.lower() if lower_case else v for v in vocab]

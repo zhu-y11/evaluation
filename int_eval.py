@@ -13,8 +13,7 @@ import os
 
 import torch
 
-import config
-import emb_loader
+import config, emb_loader
 from word_similarity import calc_wordsim
 
 import logging

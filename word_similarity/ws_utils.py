@@ -23,6 +23,8 @@ def calcSpearmanr(emb_vocab, emb_vectors, word_pairs, sims):
       emb_sims[i] = 0
       continue
     emb_sims[i] = F.cosine_similarity(emb_vectors[emb_vocab.index(w1)].view(1, -1), emb_vectors[emb_vocab.index(w2)].view(1, -1))[0] 
+    if torch.isnan(emb_sims[i]):
+      emb_sims[i] = 0
   return metrics.spearmanr(emb_sims, sims)
 
 

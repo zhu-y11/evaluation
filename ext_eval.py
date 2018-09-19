@@ -3,7 +3,7 @@
 """
 Extrinsic Evaluation for word embeddings
 @Author Yi Zhu
-Upated 23/01/2017
+Upated 06/07/2017
 """
 
 #************************************************************
@@ -13,13 +13,31 @@ import os
 
 import torch
 
-import config, emb_loader, CONLLU_loader, semeval16t5_loader
-import pos_tagging_bilstm, sentiment_analysis
-from lang_map import ud_map
+import config, emb_loader
+from absa import semeval16t5_loader, sentiment_analysis
+
+import logging
+logger = logging.getLogger(__name__)
 
 import pdb
 
-os.chdir(os.getcwd())
+def absa(args, data_path, sbt, slt, domain):
+  logger.info('Loading ABSA Data...')
+  train_data, dev_data, test_data = semeval16t5_loader.loadData(data_path)
+  for i, emb_path in enumerate(args.emb_path):
+    lang = args.lang[i]
+    if lang not in train_data or lang not in dev_data or lang not in test_data:
+      logger.debug('ABSA {} data does not exist, proceed to next embeddings'.format(lang))
+      continue
+    logger.info('Loading word embeddings: {}'.format(os.path.basename(emb_path)))
+    vocab, emb = emb_loader.loadEmbed(emb_path, args.lower_case)
+    logger.info('Lang {}, absa {} {} {}...'.format(lang, sbt, slt, domain))
+    sentiment_analysis.evalEmbed(vocab, emb, 
+                                train_data[lang][sbt][domain],
+                                dev_data[lang][sbt][domain], 
+                                test_data[lang][sbt][domain], 
+                                lang, slt, args.lower_case, args.cuda)
+
 
 def main(args):
   args.cuda = args.cuda if torch.cuda.is_available() else False
@@ -52,8 +70,3 @@ def loadDataAndEval(args, embs_map):
     sentiment_analysis.evalEmbed(embs_map['en'], train_data['en']['subtask1']['restaurant'],
                                                  dev_data['en']['subtask1']['restaurant'], 
                                                  test_data['en']['subtask1']['restaurant'], 'en', args.cuda)
-
-
-if __name__ == '__main__':
-  args = config.parse_args()
-  main(args)

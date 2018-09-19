@@ -3,7 +3,7 @@
 """
 Multilingual Sentiment Analysis 
 @Author Yi Zhu
-Upated 23/01/2018
+Upated 06/06/2018
 """
 
 #************************************************************
@@ -12,7 +12,6 @@ Upated 23/01/2018
 import random
 from random import shuffle
 from tqdm import tqdm
-import string
 
 import torch
 import torch.nn as nn
@@ -22,11 +21,14 @@ import torch.optim as optim
 torch.manual_seed(1234)
 random.seed(1234)
 
+import logging
+logger = logging.getLogger(__name__)
+
 import pdb
 
 
 class absaAnalyzer(nn.Module):
-  def __init__(self, word2idx, idx2word, ent2idx, idx2ent, asp2idx, idx2asp, pol2idx, idx2pol, ea2idx, idx2ea, emb_vocab, emb, max_seq_len):
+  def __init__(self, word2idx, idx2word, ent2idx, idx2ent, asp2idx, idx2asp, pol2idx, idx2pol, ea2idx, idx2ea, eapos2idx, idx2eapos, pos2idx, idx2pos, emb_vocab, emb, slt, max_seq_len, bs, hidden_dim = 750, bidirectional = True, num_layers = 2):
     super(absaAnalyzer, self).__init__()
 
     self.word2idx = word2idx
@@ -39,61 +41,42 @@ class absaAnalyzer(nn.Module):
     self.idx2pol = idx2pol
     self.ea2idx = ea2idx
     self.idx2ea = idx2ea
+    self.eapos2idx = eapos2idx
+    self.idx2eapos = idx2eapos
+    self.pos2idx = pos2idx
+    self.idx2pos = idx2pos
+
     self.vocab_size = len(word2idx)
     self.vocab_pad = self.vocab_size
     self.ent_size = len(ent2idx)
     self.asp_size = len(asp2idx)
     self.pol_size = len(pol2idx)
     self.ea_size = len(ea2idx)
+    self.eapos_size = len(eapos2idx)
+    self.pos_size = len(pos2idx)
  
     self.max_seq_len = max_seq_len
+    self.bs = bs
 
     # word embedding dim = pre-trained emb dim
     self.embed_dim = emb.size()[1]
     self.word_embeds = self.initEmbeds(emb_vocab, emb)    
-    # conv layer
-    self.filter_n = 300
-    self.win = 5
-
-    self.conv1 = nn.Conv2d(1, self.filter_n, (self.win, self.embed_dim))
-    self.tanh = nn.Tanh()
-    # polling
-    self.maxpool = nn.MaxPool1d(self.max_seq_len - self.win + 1)
-    #MLP
-    self.h_dim = 100
-    self.l1 = nn.Linear(self.filter_n, self.h_dim)
-    self.l2 = nn.Linear(self.h_dim, self.ea_size)
-    #sigmoid
-    self.t = 0.2
-    self.sigmoid = nn.Sigmoid()
-
-    '''
-    # entity dim and aspect dim are the same
-    self.ea_dim = ea_dim
-    # initialize both randomly
-    self.ent_embeds = nn.Embedding(self.ent_size, self.ea_dim)
-    self.asp_embeds = nn.Embedding(self.asp_size, self.ea_dim)
-
-    self.dropout = nn.Dropout(p = 0.3)
 
     self.hidden_dim = hidden_dim
+    self.bidirectional = bidirectional
     self.num_layers = num_layers
-    self.bidirectional = bidirectional 
-    self.lstm = nn.LSTM(self.embed_dim, self.hidden_dim // 2, 
-                        num_layers = self.num_layers, dropout = 0.3, bidirectional = self.bidirectional)
-    self.hidden = self.init_hidden()
-    
-    # scoring network for attentions
-    self.mlp_intoh = nn.Linear(self.hidden_dim + 2 * self.ea_dim, mlph_dim)
-    self.mlp_htoo = nn.Linear(mlph_dim, 1)
 
-    # projection from hidden_dim to target size
-    self.atttoo = nn.Linear(self.hidden_dim, self.target_size)
-    '''
+    logger.info('Initializing model for {}'.format(slt))
+    if slt == 'slot1':
+      # slot 1
+      self.init_slt1()
+    elif slt == 'slot2':
+      # slot 2
+      self.init_slt2()
 
 
   def initEmbeds(self, emb_vocab, emb):
-    print('initializing embedding layers ...')
+    logger.info('initializing embedding layers ...')
     # initialize randomly with padding
     embeds = nn.Embedding(self.vocab_size + 1, self.embed_dim, padding_idx = self.vocab_size)
     for w, idx in tqdm(self.word2idx.items(), total = self.vocab_size):
@@ -105,10 +88,36 @@ class absaAnalyzer(nn.Module):
     return embeds
 
 
+  def init_slt1(self):
+    # conv layer
+    self.filter_n = 300
+    self.win = 5
+    self.conv1 = nn.Conv2d(1, self.filter_n, (self.win, self.embed_dim))
+    self.tanh = nn.Tanh()
+    # polling
+    self.maxpool = nn.MaxPool1d(self.max_seq_len - self.win + 1)
+    #MLP
+    self.h_dim = 100
+    self.l1 = nn.Linear(self.filter_n, self.h_dim)
+    self.l2 = nn.Linear(self.h_dim, self.ea_size)
+    # threshold
+    self.t = 0.2
+
+
+  def init_slt2(self):
+    self.dropout = nn.Dropout(p = 0.4)
+
+    self.lstm = nn.LSTM(self.embed_dim, self.hidden_dim // 2, 
+                        num_layers = self.num_layers, dropout = 0.4, bidirectional = self.bidirectional)
+    self.hidden = self.init_hidden()
+
+    self.h2o = nn.Linear(self.hidden_dim, self.pos_size)    
+
+
   def init_hidden(self):
-    n_lstm = 2 if self.bidirectional else 1
-    return (torch.randn(self.num_layers * n_lstm, 1, self.hidden_dim // 2, requires_grad = True),
-            torch.randn(self.num_layers * n_lstm, 1, self.hidden_dim // 2, requires_grad = True))
+    bi_lstm = 2 if self.bidirectional else 1
+    return (torch.randn(self.num_layers * bi_lstm, self.bs, self.hidden_dim // 2, requires_grad = True),
+            torch.randn(self.num_layers * bi_lstm, self.bs, self.hidden_dim // 2, requires_grad = True))
 
 
   def forward(self, in_seqs): 
@@ -118,9 +127,9 @@ class absaAnalyzer(nn.Module):
 
     pooling_layer = self.maxpool(conv_layer).squeeze()
     h1 = self.l1(pooling_layer)
-    pdb.set_trace()
     h2 = self.l2(h1)
-    probs = self.sigmoid(h2)
+    #probs = self.sigmoid(h2)
+    return h2
 
 
     '''
@@ -159,25 +168,31 @@ class absaAnalyzer(nn.Module):
     '''
 
 
-def evalEmbed(emb_vocab, emb, train_data, dev_data, test_data, lang, lower_case, cuda, bs = 100, max_seq_len = 50, epoch = 20, report_every = 5):
+def evalEmbed(emb_vocab, emb, train_data, dev_data, test_data, lang, slt, lower_case, cuda, 
+    bs = 100, max_seq_len = 60, epoch = 20, report_every = 5):
   if cuda:
     torch.cuda.manual_seed(1234)
-  word2idx, idx2word, \
-  ent2idx, idx2ent,\
-  asp2idx, idx2asp,\
-  pol2idx, idx2pol,\
-  ea2idx, idx2ea = get_vocab_entity_aspect_polarity(train_data, dev_data, test_data, lower_case)
+  (word2idx, idx2word,
+  ent2idx, idx2ent,
+  asp2idx, idx2asp,
+  pol2idx, idx2pol,
+  ea2idx, idx2ea,
+  eapos2idx, idx2eapos,
+  pos2idx, idx2pos) = get_vocab_entity_aspect_polarity(train_data, dev_data, test_data, lower_case)
   analyzer = absaAnalyzer(word2idx, idx2word, 
                           ent2idx, idx2ent, 
                           asp2idx, idx2asp,
                           pol2idx, idx2pol, 
                           ea2idx, idx2ea,
-                          emb_vocab, emb, max_seq_len)
-  criterion = nn.NLLLoss()
-  optimizer = optim.Adam(analyzer.parameters()) 
-  #optimizer = optim.SGD(analyzer.parameters(), lr = 0.01, momentum = 0.9) 
+                          eapos2idx, idx2eapos,
+                          pos2idx, idx2pos,
+                          emb_vocab, emb, slt, max_seq_len, bs)
   if cuda:
     analyzer.cuda()
+
+  criterion1 = nn.BCEWithLogitsLoss()
+  criterion2 = nn.NLLLoss()
+  optimizer = optim.Adam(analyzer.parameters()) 
 
   ''' 
     [
@@ -188,12 +203,13 @@ def evalEmbed(emb_vocab, emb, train_data, dev_data, test_data, lang, lower_case,
       ...
     ]
   '''
-  train_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, pol2idx, ea2idx, lower_case, max_seq_len, cuda)
-  dev_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, pol2idx, ea2idx, lower_case, max_seq_len, cuda)
-  test_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, pol2idx, ea2idx, lower_case, max_seq_len, cuda)
+  #train_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, pol2idx, ea2idx, lower_case, max_seq_len, cuda)
+  train_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, pol2idx, ea2idx, eapos2idx, pos2idx, slt, lower_case, max_seq_len, cuda)
+  dev_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, pol2idx, ea2idx, eapos2idx, pos2idx, slt, lower_case, max_seq_len, cuda)
+  test_seqs = prepSeqs(dev_data, word2idx, ent2idx, asp2idx, pol2idx, ea2idx, eapos2idx, pos2idx, slt, lower_case, max_seq_len, cuda)
 
-  best_acc_dev = .0
-  corbest_acc_test = .0
+  best_r_dev = (.0, .0, .0)
+  corbest_r_test = (.0, .0, .0)
   # total batch number
   n_batch = len(train_seqs) // bs if len(train_seqs) % bs == 0 else len(train_seqs) // bs + 1
   for i in range(epoch):
@@ -201,18 +217,16 @@ def evalEmbed(emb_vocab, emb, train_data, dev_data, test_data, lang, lower_case,
     shuffle(train_seqs)
     for j in range(n_batch):
       batch_train = train_seqs[j * bs: (j + 1) * bs]
-      total_loss_train, r_train = train(batch_train, analyzer, criterion, optimizer, cuda) 
-      '''
+      total_loss_train, pre_train, rec_train, f_train = train(batch_train, analyzer, criterion, optimizer, cuda) 
       if j % report_every == 0:
-        _, acc_dev = test(train_seqs, analyzer, criterion, cuda)
-        _, acc_test = test(test_seqs, analyzer, criterion, cuda)
-        print('current dev_acc = {:.3f}%, current test_acc = {:.3f}%'.format(acc_dev, acc_test))
-        if acc_dev > best_acc_dev:
-          best_acc_dev = acc_dev
-          corbest_acc_test = acc_test 
+        _, pre_dev, rec_dev, f_dev = test(train_seqs, analyzer, criterion, cuda)
+        _, pre_test, rec_test, f_test = test(test_seqs, analyzer, criterion, cuda)
+        print('current dev = {:.3f} {:.3f} {:.3f}, current test = {:.3f} {:.3f} {:.3f}'.format(pre_dev, rec_dev, f_dev, pre_test, rec_test, f_test))
+        if f_dev > best_r_dev[-1]:
+          best_r_dev = (pre_dev, rec_dev, f_dev)
+          corbest_r_test = (pre_test, rec_test, f_test)
           #torch.save(analyzer, 'best_analyzer_{}.model'.format(lang))
-      print("epoch {}, batch {}/{}\nloss = {:.5f}  train_acc = {:.3f}%\nbest dev_acc = {:.3f}%  corresponding test_acc = {:.3f}%".format(i + 1, j + 1, n_batch, total_loss_train / len(batch_train), acc_train, best_acc_dev, corbest_acc_test))
-      '''
+      print("epoch {}, batch {}/{}\nloss = {:.5f}  train_f = {:.3f}\nbest dev_f = {:.3f}  corresponding test_f = {:.3f}".format(i + 1, j + 1, n_batch, total_loss_train / len(batch_train), f_train, best_r_dev[-1], corbest_r_test[-1]))
 
 
 def get_vocab_entity_aspect_polarity(train_data, dev_data, test_data, lower_case):
@@ -221,9 +235,12 @@ def get_vocab_entity_aspect_polarity(train_data, dev_data, test_data, lower_case
   asps = [] # aspects
   pols = [] # polarity labels
   eas = [] # entity#aspect tuples
-  get_all_terms(train_data, vocab, ents, asps, pols, eas, lower_case, is_train_data = True)
-  get_all_terms(dev_data, vocab, ents, asps, pols, eas, lower_case)
-  get_all_terms(test_data, vocab, ents, asps, pols, eas, lower_case)
+  eapos = ['O'] # entity#aspect_POS for slot 1&2
+  pos = ['B', 'I', 'O'] # Position for slot 2
+
+  get_all_terms(train_data, vocab, ents, asps, pols, eas, eapos, lower_case, is_train_data = True)
+  get_all_terms(dev_data, vocab, ents, asps, pols, eas, eapos, lower_case)
+  get_all_terms(test_data, vocab, ents, asps, pols, eas, eapos, lower_case)
 
   # append UNK to the last index
   vocab.append('UNK')
@@ -247,19 +264,26 @@ def get_vocab_entity_aspect_polarity(train_data, dev_data, test_data, lower_case
   ea2idx = dict(zip(eas, range(len(eas))))
   idx2ea = dict(zip(range(len(eas)), eas))
 
-  return word2idx, idx2word, ent2idx, idx2ent, asp2idx, idx2asp, pol2idx, idx2pol, ea2idx, idx2ea
+  eapos = set(eapos)
+  eapos2idx = dict(zip(eapos, range(len(eapos))))
+  idx2eapos = dict(zip(range(len(eapos)), eapos))
+
+  pos2idx = dict(zip(pos, range(len(pos))))
+  idx2pos = dict(zip(range(len(pos)), pos))
+
+  return word2idx, idx2word, ent2idx, idx2ent, asp2idx, idx2asp, pol2idx, idx2pol, ea2idx, idx2ea, eapos2idx, idx2eapos, pos2idx, idx2pos
 
 
-def get_all_terms(input_data, vocab, ents, asps, pols, eas, lower_case, is_train_data = False):
+def get_all_terms(input_data, vocab, ents, asps, pols, eas, eapos, lower_case, is_train_data = False):
   for sent, ops in input_data.items():
     # only add words in trainin data to vocab
     if is_train_data:
-      # remove punctuations
-      vocab.extend([word.lower() if lower_case else word for word in sent.strip().split(' ') if word not in string.punctuation])
+      vocab.extend([word.lower() if lower_case else word for word in sent.strip().split(' ')])
     for op in ops:
       ea = op['category']
       cats = ea.split('#')
       eas.append(ea)
+      eapos.extend([ea + '_B', ea + '_I'])
       ents.append(cats[0])
       asps.append(cats[1])
       pols.append(op['polarity']) 
@@ -271,30 +295,52 @@ def prepSeq(seq, to_idx, cuda, max_seq_len = -1):
   return tensor.cuda() if cuda else tensor
 
 
-def prepTarget(ops, ent2idx, asp2idx, pol2idx, ea2idx, cuda):
+def prepTarget(tokens, ops, ent2idx, asp2idx, pol2idx, ea2idx, eapos2idx, pos2idx, slt, cuda):
+  sent = ' '.join(tokens)
   target = []
+  pos = [pos2idx['O']] * len(tokens)
   for op in ops:
     #ent, asp = op['category'].split('#')
-    ea = op['category']
-    target.append(ea)
-  target = list(set(target))
-  return prepSeq(target, ea2idx, cuda)
-  '''
-    ents.append(cats[0])
-    asps.append(cats[1])
-    lbs.append(op['polarity'])
-  ent_seq = prepSeq(ents, ent2idx, cuda)
-  asp_seq = prepSeq(asps, asp2idx, cuda)
-  lb_seq = prepSeq(lbs, lb2idx, cuda)
-  '''
+    if slt == 'slot1':
+      ea = op['category']
+      target.append(ea)
+    elif slt == 'slot2':
+      update_pos(sent, tokens, op, pos, pos2idx)
+
+  if slt == 'slot1':
+    target = list(set(target))
+    target = prepSeq(target, ea2idx, cuda)
+    target_vec = torch.zeros(len(ea2idx), dtype = torch.float)
+    target_vec[target] = 1
+    return target_vec
+  elif slt == 'slot2':
+    pos = torch.LongTensor(pos)
+    if cuda:
+      pos = pos.cuda()
+    return pos
 
 
-def prepSeqs(data, word2idx, ent2idx, asp2idx, pol2idx, ea2idx, lower_case, max_seq_len, cuda):
+def update_pos(sent, tokens, op, pos, pos2idx):
+  start = int(op['from'])
+  end = int(op['to'])
+  if start == 0 and end == 0:
+    # NULL
+    return
+  else:
+    start_idx = sent[:start].count(' ')
+    end_idx = start_idx + 1 + sent[start: end].count(' ')
+    assert(sent[start: end] == ' '.join(tokens[start_idx: end_idx]))
+    pos[start_idx] = pos2idx['B']
+    pos[start_idx + 1: end_idx] = [pos2idx['I']] * (end_idx - start_idx - 1)
+    
+
+def prepSeqs(data, word2idx, ent2idx, asp2idx, pol2idx, ea2idx, eapos2idx, pos2idx, slt, lower_case, max_seq_len, cuda):
   new_data = []
   for sent, ops in data.items():
-    tokens = [w.lower() if lower_case else w for w in sent.strip().split(' ') if w not in string.punctuation]
+    tokens = [w.lower() if lower_case else w for w in sent.strip().split(' ')]
     input_seq = prepSeq(tokens, word2idx, cuda, max_seq_len)
-    target_seq = prepTarget(ops, ent2idx, asp2idx, pol2idx, ea2idx, cuda)
+    target_seq = prepTarget(tokens, ops, ent2idx, asp2idx, pol2idx, ea2idx, eapos2idx, pos2idx, slt, cuda)
+    pdb.set_trace()
     new_data.append([input_seq, target_seq])
   return new_data
 
@@ -305,42 +351,53 @@ def train(train_seqs, analyzer, criterion, optimizer, cuda):
   # training mode
   analyzer.train()
   # eval metrics
-  pre = 0
-  rec = 0
-  tot = 0
+  cor = 0
+  pred_n = 0
+  real_n = 0
   in_seqs, target_seqs = zip(*train_seqs)
   in_seqs = torch.stack(in_seqs)
-  probs = analyzer(in_seqs)
-  '''
-  # number of instances
-  n_inst = 0
-  for train_seq, ent_seq, asp_seq, lb_seq in train_seqs:
-    probs = analyzer(train_seq, ent_seq, asp_seq)
-    loss = criterion(probs, lb_seq)
-    acc += (probs.max(1)[1] == lb_seq).data[0]
-    total_loss += loss.data
-    n_inst += len(lb_seq) 
-    loss.backward()
-  acc = acc * 100.0 / n_inst 
-  total_loss = total_loss[0]
-  # update minibatch
+  target_seqs = torch.stack(target_seqs)
+  real_n = target_seqs.sum()
+
+  scores = analyzer(in_seqs)
+  loss = criterion(scores, target_seqs)
+  loss.backward()
   optimizer.step()
-  return total_loss, acc
-  '''
+
+  sys_seqs = (F.sigmoid(scores) > analyzer.t).type(torch.float)
+  pred_n = sys_seqs.sum()
+  re_seqs = ((sys_seqs + target_seqs) == 2).type(torch.float)
+  cor = re_seqs.sum()
+
+  pre = cor / pred_n
+  rec = cor / real_n
+  f_score = 2 * pre * rec / (pre + rec)
+
+  return  loss, pre, rec, f_score
+
 
 
 def test(seqs, analyzer, criterion, cuda):
+  # evaluation mode
   analyzer.eval()
-  total_loss = torch.cuda.FloatTensor([0]) if cuda else torch.FloatTensor([0])
-  acc = 0
-  n_inst = 0
-  for seq, ent_seq, asp_seq, lb_seq in seqs:
-    probs = analyzer(seq, ent_seq, asp_seq)
-    loss = criterion(probs, lb_seq)
-    acc += (probs.max(1)[1] == lb_seq).data[0]
-    total_loss += loss.data
-    n_inst += len(lb_seq) 
-  acc = acc * 100.0 / n_inst 
-  total_loss = total_loss[0]
-  return total_loss, acc
+  # eval metrics
+  cor = 0
+  pred_n = 0
+  real_n = 0
+  in_seqs, target_seqs = zip(*seqs)
+  in_seqs = torch.stack(in_seqs)
+  target_seqs = torch.stack(target_seqs)
+  real_n = target_seqs.sum()
+
+  scores = analyzer(in_seqs)
+  sys_seqs = (F.sigmoid(scores) > analyzer.t).type(torch.float)
+  pred_n = sys_seqs.sum()
+  re_seqs = ((sys_seqs + target_seqs) == 2).type(torch.float)
+  cor = re_seqs.sum()
+
+  pre = cor / pred_n
+  rec = cor / real_n
+  f_score = 2 * pre * rec / (pre + rec)
+
+  return None, pre, rec, f_score
   
