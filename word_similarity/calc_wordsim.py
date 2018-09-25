@@ -39,6 +39,8 @@ def eval_file_word_similarity(test_data_lang_dir, file_name, vocab, emb, lower_c
   print('Test File: {}'.format(file_name))
   test_file = os.path.join(test_data_lang_dir, file_name) 
   word_pairs, sims = readData(test_file, lower_case)
+  if os.path.basename(test_file).startswith('7.card660.en'):
+    vocab, emb = update_vocab_emb(word_pairs, vocab, emb)
   logging.debug('finding intersecting coverage...')
   inter_vocab, inter_emb, inter_word_pairs, inter_sims = findIntersec(vocab, emb, word_pairs, sims)
   r = (len(word_pairs), calcSpearmanr(vocab, emb, word_pairs, sims))
@@ -54,3 +56,24 @@ def readData(data_file_path, lower_case):
     word_pairs = [[line[0].lower(), line[1].lower()] if lower_case else [line[0], line[1]] for line in lines]
     sims = torch.Tensor(list(map(float, [line[-1] for line in lines])))
     return word_pairs, sims
+
+
+def update_vocab_emb(word_pairs, vocab, emb):
+  for word_pair in word_pairs:
+    for w in word_pair:
+      w_seq = w.split('_')
+      if len(w_seq) == 1:
+        continue
+      emb_list = []
+      for s in w_seq:
+        if s not in vocab:
+          continue
+        s_idx = vocab.index(s)
+        s_emb = emb[s_idx]
+        emb_list.append(s_emb)
+      if len(emb_list) > 0:
+        vocab.append(w)
+        # simple addition
+        w_emb = sum(emb_list).unsqueeze(0)
+        emb = torch.cat((emb, w_emb))
+  return vocab, emb

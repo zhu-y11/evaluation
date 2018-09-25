@@ -11,7 +11,7 @@ Main entry of evaluation scripts
 #************************************************************
 from config import parse_args
 from int_eval import word_similarity
-from ext_eval import absa
+#from ext_eval import absa
 
 import logging
 logger = logging.getLogger()
